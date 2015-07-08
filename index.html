@@ -21,30 +21,58 @@ function initialize() {
     center: {lat: 32.397, lng: 34}
   });
     google.maps.event.addDomListener(map, 'zoom_changed', function() {
-      console.log("zoom: " + map.getZoom());   
+    //  console.log("zoom: " + map.getZoom());
      });
-   
+
 }
 
 google.maps.event.addDomListener(window, 'load', initialize);
     </script>
     <script>
-        var progressCounter = 0;
+
+      // Constants
+      var LEFT_HAND = 0, RIGHT_HAND = 1;
+      var X = 0, Y = 1, Z = 2;
+
+      // Variables
+      var handPositionX = null;
+      var handPositionY = null;
+      var rightHand = null;
+
+      var progressCounter = 0;
       var controller = Leap.loop({enableGestures: true}, function(frame){
-          
-          if(frame.valid && frame.gestures.length > 0) {
+          if(frame.valid) {
+          rightHand = frame.hands[RIGHT_HAND];
+
+          if (isGripped(frame.hands[RIGHT_HAND])) {
+              if (handPositionX != null) {
+                var dx =  handPositionX - rightHand.stabilizedPalmPosition[X];
+                var dy =  handPositionY - rightHand.stabilizedPalmPosition[Y];
+                move(dx, dy);
+              }
+
+              handPositionX = rightHand.stabilizedPalmPosition[X];
+              handPositionY = rightHand.stabilizedPalmPosition[Y];
+          }
+          else {
+            handPositionX = null;
+            handPositionY = null;
+          }
+
+          if(frame.gestures.length > 0) {
+
                 frame.gestures.forEach(function(gesture){
-                    
+
                 if (gesture.type == "circle") {
-                    
+
                     if (gesture.state == "stop") {
                         progressCounter = 0;
-                    } 
+                    }
                         var clockwise = false;
                         var pointableID = gesture.pointableIds[0];
                         var direction = frame.pointable(pointableID).direction;
-                        console.log("direction: " + direction, "gesture.normal: " + gesture.normal); 
-                        console.log("progress: " + gesture.progress); 
+                      //  console.log("direction: " + direction, "gesture.normal: " + gesture.normal);
+                      //  console.log("progress: " + gesture.progress);
                         var dotProduct = Leap.vec3.dot(direction, gesture.normal);
 
                         if (dotProduct  >  0) {clockwise = true;}
@@ -52,18 +80,19 @@ google.maps.event.addDomListener(window, 'load', initialize);
                             zoomIn();
                             progressCounter++;
                         }
-                        if (!clockwise && gesture.progress > progressCounter) {
+                        else if (!clockwise && gesture.progress > progressCounter) {
                             zoomOut();
                             progressCounter++;
                         }
                     }
-                
+
                 });
             }
-          
+          }
 
-          
-          
+
+
+
 //  if(frame.valid && frame.gestures.length > 0){
 //    frame.gestures.forEach(function(gesture){
 //        switch (gesture.type){
@@ -83,23 +112,23 @@ google.maps.event.addDomListener(window, 'load', initialize);
 //    });
 //  }
 });
-        
-        
-        
-        
+
+
+
+
     controller.on('connect', function() {
         document.getElementById('status').innerHTML = "connected";
     });
-    
+
     controller.on('disconnect', function () {
         alert('disconnected');
-       document.getElementById('status').innerHTML = "disconnected"; 
+       document.getElementById('status').innerHTML = "disconnected";
     });
-        
+
     controller.on('deviceRemoved', function() {
-       alert('removed'); 
+      document.getElementById('status').innerHTML = "removed";
     });
-        
+
 //    controller.on('gesture', function(gesture) {
 //        if(gesture.type == "swipe") {
 //          //Classify swipe as either horizontal or vertical
@@ -116,7 +145,7 @@ google.maps.event.addDomListener(window, 'load', initialize);
 //                  swipeDirection = "up";
 //              } else {
 //                  swipeDirection = "down";
-//              }                  
+//              }
 //          }
 //          console.log(swipeDirection)
 //       }
@@ -127,30 +156,46 @@ google.maps.event.addDomListener(window, 'load', initialize);
 //     }
 //       }
 //    });
-    
+
     flag = false;
-        
-    function zoomIn() {  
+
+    function zoomIn() {
         var newVal = map.getZoom() +1;
         map.setZoom(parseFloat(newVal.toFixed(2)));
-        console.log(newVal.toFixed(2));
+      //  console.log(newVal.toFixed(2));
         flag = true;
-         setTimeout(function() { 
+         setTimeout(function() {
          flag = false;
-         }, 300);    
+         }, 300);
     }
-        
+
     function zoomOut() {
         var newVal = map.getZoom() - 1;
         map.setZoom(parseFloat(newVal.toFixed(2)));
-        console.log(newVal.toFixed(2));
+      //  console.log(newVal.toFixed(2));
         flag = true;
-         setTimeout(function() { 
+         setTimeout(function() {
          flag = false;
-         }, 300);    
+         }, 300);
     }
-     
-        
+
+    /** Returns the truth that a Leap Motion API Hand object is currently in a gripped or "grabbed" state.
+    */
+    function isGripped(hand) {
+      return hand.grabStrength == 1.0;
+    }
+
+    function move(dX, dY)
+    {
+      var center = map.getCenter();
+      var scaling = 4.0 / Math.pow(2, map.getZoom()-1); // Specific scaling for Google Maps
+      var newLat = center.lat() + dY * scaling;
+      var newLng = center.lng() + dX * scaling;
+      var newCenter = new google.maps.LatLng(newLat, newLng);
+
+      map.setCenter(newCenter);
+    }
+
     </script>
   </head>
   <body>
